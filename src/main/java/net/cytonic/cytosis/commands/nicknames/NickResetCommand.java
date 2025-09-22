@@ -7,6 +7,7 @@ import net.cytonic.cytosis.player.CytosisPlayer;
 import net.cytonic.cytosis.utils.Msg;
 
 public class NickResetCommand extends CytosisCommand {
+
     public NickResetCommand() {
         super("reset");
         setCondition(CommandUtils.IS_STAFF);
@@ -17,7 +18,8 @@ public class NickResetCommand extends CytosisCommand {
                 return;
             }
             Cytosis.getNicknameManager().disableNickname(player.getUuid());
-            player.sendMessage(Msg.splash("UNNICKED!", "#BE9025", "Your apparent name, rank, and skin have been reset to your nomal self."));
+            player.sendMessage(Msg.splash("UNNICKED!", "#BE9025",
+                "Your apparent name, rank, and skin have been reset to your nomal self."));
         });
     }
 }

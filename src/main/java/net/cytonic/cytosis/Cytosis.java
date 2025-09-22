@@ -1,5 +1,23 @@
 package net.cytonic.cytosis;
 
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.Strictness;
@@ -8,6 +26,26 @@ import eu.koboo.minestom.stomui.core.MinestomUI;
 import io.github.classgraph.ClassGraph;
 import lombok.Getter;
 import lombok.Setter;
+import net.hollowcube.polar.PolarLoader;
+import net.kyori.adventure.key.Key;
+import net.minestom.server.Auth;
+import net.minestom.server.MinecraftServer;
+import net.minestom.server.command.CommandManager;
+import net.minestom.server.command.ConsoleSender;
+import net.minestom.server.coordinate.Pos;
+import net.minestom.server.entity.Player;
+import net.minestom.server.event.Event;
+import net.minestom.server.instance.InstanceContainer;
+import net.minestom.server.instance.LightingChunk;
+import net.minestom.server.instance.block.Block;
+import net.minestom.server.network.ConnectionManager;
+import net.minestom.server.network.packet.client.play.ClientCommandChatPacket;
+import net.minestom.server.network.packet.client.play.ClientSignedCommandChatPacket;
+import net.minestom.server.timer.TaskSchedule;
+import org.jetbrains.annotations.NotNull;
+import org.spongepowered.configurate.gson.GsonConfigurationLoader;
+import org.spongepowered.configurate.objectmapping.ObjectMapper;
+
 import net.cytonic.cytosis.commands.utils.CommandHandler;
 import net.cytonic.cytosis.config.CytosisSettings;
 import net.cytonic.cytosis.config.CytosisSnoops;
@@ -29,7 +67,21 @@ import net.cytonic.cytosis.events.api.Listener;
 import net.cytonic.cytosis.events.api.Priority;
 import net.cytonic.cytosis.files.FileManager;
 import net.cytonic.cytosis.logging.Logger;
-import net.cytonic.cytosis.managers.*;
+import net.cytonic.cytosis.managers.ActionbarManager;
+import net.cytonic.cytosis.managers.ChatManager;
+import net.cytonic.cytosis.managers.CommandDisablingManager;
+import net.cytonic.cytosis.managers.FriendManager;
+import net.cytonic.cytosis.managers.InstanceManager;
+import net.cytonic.cytosis.managers.LocalCooldownManager;
+import net.cytonic.cytosis.managers.NetworkCooldownManager;
+import net.cytonic.cytosis.managers.NpcManager;
+import net.cytonic.cytosis.managers.PlayerListManager;
+import net.cytonic.cytosis.managers.PreferenceManager;
+import net.cytonic.cytosis.managers.RankManager;
+import net.cytonic.cytosis.managers.ServerInstancingManager;
+import net.cytonic.cytosis.managers.SideboardManager;
+import net.cytonic.cytosis.managers.SnooperManager;
+import net.cytonic.cytosis.managers.VanishManager;
 import net.cytonic.cytosis.messaging.NatsManager;
 import net.cytonic.cytosis.metrics.CytosisOpenTelemetry;
 import net.cytonic.cytosis.metrics.MetricsHooks;
@@ -42,35 +94,6 @@ import net.cytonic.cytosis.utils.BlockPlacementUtils;
 import net.cytonic.cytosis.utils.Msg;
 import net.cytonic.cytosis.utils.Utils;
 import net.cytonic.cytosis.utils.polar.PolarExtension;
-import net.hollowcube.polar.PolarLoader;
-import net.kyori.adventure.key.Key;
-import net.minestom.server.Auth;
-import net.minestom.server.MinecraftServer;
-import net.minestom.server.command.CommandManager;
-import net.minestom.server.command.ConsoleSender;
-import net.minestom.server.coordinate.Pos;
-import net.minestom.server.entity.Player;
-import net.minestom.server.event.Event;
-import net.minestom.server.instance.InstanceContainer;
-import net.minestom.server.instance.LightingChunk;
-import net.minestom.server.instance.block.Block;
-import net.minestom.server.network.ConnectionManager;
-import net.minestom.server.network.packet.client.play.ClientCommandChatPacket;
-import net.minestom.server.network.packet.client.play.ClientSignedCommandChatPacket;
-import net.minestom.server.timer.TaskSchedule;
-import org.jetbrains.annotations.NotNull;
-import org.spongepowered.configurate.gson.GsonConfigurationLoader;
-import org.spongepowered.configurate.objectmapping.ObjectMapper;
-
-import java.io.File;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The main class for Cytosis
@@ -86,17 +109,24 @@ public final class Cytosis {
     /**
      * The instance of Gson for serializing and deserializing objects. (Mostly for preferences).
      */
-    public static final Gson GSON = new GsonBuilder().registerTypeAdapter(TypedNamespace.class, new TypedNamespaceAdapter()).registerTypeAdapter(Preference.class, new PreferenceAdapter<>()).registerTypeAdapter(Key.class, new KeyAdapter()).registerTypeAdapter(Instant.class, new InstantAdapter()).registerTypeAdapterFactory(new TypedNamespaceAdapter()).registerTypeAdapterFactory(new PreferenceAdapter<>()).registerTypeAdapterFactory(new KeyAdapter()).enableComplexMapKeySerialization().setStrictness(Strictness.LENIENT).serializeNulls().create();
+    public static final Gson GSON = new GsonBuilder().registerTypeAdapter(TypedNamespace.class,
+            new TypedNamespaceAdapter())
+        .registerTypeAdapter(Preference.class, new PreferenceAdapter<>())
+        .registerTypeAdapter(Key.class, new KeyAdapter())
+        .registerTypeAdapter(Instant.class, new InstantAdapter())
+        .registerTypeAdapterFactory(new TypedNamespaceAdapter())
+        .registerTypeAdapterFactory(new PreferenceAdapter<>())
+        .registerTypeAdapterFactory(new KeyAdapter())
+        .enableComplexMapKeySerialization()
+        .setStrictness(Strictness.LENIENT).serializeNulls().create();
     public static final GsonConfigurationLoader.Builder GSON_CONFIGURATION_LOADER = GsonConfigurationLoader.builder()
-            .indent(0)
-            .defaultOptions(opts -> opts
-                    .shouldCopyDefaults(true)
-                    .serializers(builder -> {
-                        builder.registerAnnotatedObjects(ObjectMapper.factory());
-                        builder.register(Key.class, new KeySerializer());
-                        builder.register(Pos.class, new PosSerializer());
-                    })
-            );
+        .indent(0)
+        .defaultOptions(opts -> opts.shouldCopyDefaults(true)
+            .serializers(builder -> {
+                builder.registerAnnotatedObjects(ObjectMapper.factory());
+                builder.register(Key.class, new KeySerializer());
+                builder.register(Pos.class, new PosSerializer());
+            }));
     /**
      * The version of Cytosis
      */
@@ -142,7 +172,7 @@ public final class Cytosis {
     @Getter
     private static SideboardManager sideboardManager;
     @Getter
-    private static NPCManager npcManager;
+    private static NpcManager npcManager;
     @Getter
     private static List<String> flags;
     @Getter
@@ -293,13 +323,17 @@ public final class Cytosis {
 
         Logger.info("Adding a singed command packet handler");
         // commands
-        MinecraftServer.getPacketListenerManager().setPlayListener(ClientSignedCommandChatPacket.class, (packet, p) -> MinecraftServer.getPacketListenerManager().processClientPacket(new ClientCommandChatPacket(packet.message()), p.getPlayerConnection(), p.getPlayerConnection().getConnectionState()));
+        MinecraftServer.getPacketListenerManager()
+            .setPlayListener(ClientSignedCommandChatPacket.class,
+                (packet, p) -> MinecraftServer.getPacketListenerManager()
+                    .processClientPacket(new ClientCommandChatPacket(packet.message()), p.getPlayerConnection(),
+                        p.getPlayerConnection()
+                            .getConnectionState()));
 
         if (metricsEnabled) {
             Logger.info("Starting metric hooks");
             MetricsHooks.init();
         }
-
 
         Thread.ofVirtual().name("Cs-WorldLoader").start(Cytosis::loadWorld);
 
@@ -311,7 +345,6 @@ public final class Cytosis {
         commandDisablingManager = new CommandDisablingManager();
         commandDisablingManager.loadRemotes();
         commandDisablingManager.setupConsumers();
-
 
         Logger.info("Setting up event handlers");
         eventHandler = new EventHandler(MinecraftServer.getGlobalEventHandler());
@@ -343,13 +376,16 @@ public final class Cytosis {
         sideboardManager.autoUpdateBoards(TaskSchedule.seconds(1L));
 
         Logger.info("Starting NPC manager!");
-        npcManager = new NPCManager();
+        npcManager = new NpcManager();
 
         try {
             Logger.info("Loading network setup!");
             cytonicNetwork = new CytonicNetwork();
             cytonicNetwork.importData();
-            cytonicNetwork.getServers().put(SERVER_ID, new CytonicServer(Utils.getServerIP(), SERVER_ID, CytosisSettings.SERVER_PORT, serverGroup.type(), serverGroup.group()));
+            cytonicNetwork.getServers()
+                .put(SERVER_ID,
+                    new CytonicServer(Utils.getServerIP(), SERVER_ID, CytosisSettings.SERVER_PORT, serverGroup.type(),
+                        serverGroup.group()));
         } catch (Exception e) {
             Logger.error("An error occurred whilst loading network setup!", e);
         }
@@ -389,70 +425,67 @@ public final class Cytosis {
 
         List<ClassLoader> loaders = new ArrayList<>();
         loaders.add(Cytosis.class.getClassLoader());
-        loaders.addAll(PluginClassLoader.loaders);
+        loaders.addAll(PluginClassLoader.LOADERS);
 
-        ClassGraph graph = new ClassGraph()
-                .acceptPackages("net.cytonic") // skip dependencies
-                .enableAllInfo()
-                .overrideClassLoaders(loaders.toArray(new ClassLoader[0]));
+        ClassGraph graph = new ClassGraph().acceptPackages("net.cytonic") // skip dependencies
+            .enableAllInfo().overrideClassLoaders(loaders.toArray(new ClassLoader[0]));
 
         AtomicInteger counter = new AtomicInteger(0);
         Map<Class<?>, Object> instances = new HashMap<>();
-        graph.scan()
-                .getClassesWithMethodAnnotation(Listener.class.getName())
-                .forEach(classInfo -> {
-                    Class<?> clazz = classInfo.loadClass();
-                    Object instance;
+        graph.scan().getClassesWithMethodAnnotation(Listener.class.getName()).forEach(classInfo -> {
+            Class<?> clazz = classInfo.loadClass();
+            Object instance;
+            try {
+                Constructor<?> constructor = clazz.getDeclaredConstructor();
+                constructor.setAccessible(true);
+                instance = constructor.newInstance();
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                     NoSuchMethodException e) {
+                Logger.error("The class " + clazz.getSimpleName()
+                    + " needs to have a public, no argument constructor to have an @Listener in it!", e);
+                return;
+            }
+
+            for (Method method : clazz.getDeclaredMethods()) {
+                if (method.isAnnotationPresent(Listener.class)) {
+                    method.setAccessible(true); // make the method accessible so we can call it later on
+                    int priority = method.isAnnotationPresent(Priority.class) ? method.getAnnotation(Priority.class)
+                        .value() : 50;
+                    boolean async = method.isAnnotationPresent(Async.class);
+
+                    Class<? extends Event> eventClass;
                     try {
-                        Constructor<?> constructor = clazz.getDeclaredConstructor();
-                        constructor.setAccessible(true);
-                        instance = constructor.newInstance();
-                    } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
-                             NoSuchMethodException e) {
-                        Logger.error("The class " + clazz.getSimpleName() + " needs to have a public, no argument constructor to have an @Listener in it!", e);
+                        eventClass = (Class<? extends Event>) method.getParameterTypes()[0];
+                    } catch (ClassCastException e) {
+                        Logger.error("The parameter of a method annotated with @Listener must be a valid event!", e);
+                        return;
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                        Logger.error("Methods annotated with @Listener must have a valid event as a parameter!", e);
                         return;
                     }
 
-                    for (Method method : clazz.getDeclaredMethods()) {
-                        if (method.isAnnotationPresent(Listener.class)) {
-                            method.setAccessible(true); // make the method accessible so we can call it later on
-                            int priority = method.isAnnotationPresent(Priority.class) ? method.getAnnotation(Priority.class).value() : 50;
-                            boolean async = method.isAnnotationPresent(Async.class);
-
-                            Class<? extends Event> eventClass;
+                    eventHandler.registerListener(
+                        new EventListener<>("cytosis:annotation-listener-" + counter.getAndIncrement(), async, priority,
+                            (Class<Event>) eventClass, event -> {
                             try {
-                                eventClass = (Class<? extends Event>) method.getParameterTypes()[0];
-                            } catch (ClassCastException e) {
-                                Logger.error("The parameter of a method annotated with @Listener must be a valid event!", e);
-                                return;
-                            } catch (ArrayIndexOutOfBoundsException e) {
-                                Logger.error("Methods annotated with @Listener must have a valid event as a parameter!", e);
-                                return;
-                            }
-
-                            eventHandler.registerListener(new EventListener<>(
-                                    "cytosis:annotation-listener-" + counter.getAndIncrement(),
-                                    async, priority, (Class<Event>) eventClass, event -> {
-                                try {
-                                    method.invoke(instance, event);
-                                } catch (IllegalAccessException e) {
-                                    Logger.error("Failed to call @Listener!", e);
-                                } catch (InvocationTargetException e) {
-                                    Throwable cause = e.getCause();
-                                    if (cause != null) {
-                                        Logger.error("Exception in @Listener method: ", cause);
-                                    } else {
-                                        Logger.error("Unknown error in @Listener method.", e);
-                                    }
+                                method.invoke(instance, event);
+                            } catch (IllegalAccessException e) {
+                                Logger.error("Failed to call @Listener!", e);
+                            } catch (InvocationTargetException e) {
+                                Throwable cause = e.getCause();
+                                if (cause != null) {
+                                    Logger.error("Exception in @Listener method: ", cause);
+                                } else {
+                                    Logger.error("Unknown error in @Listener method.", e);
                                 }
                             }
-                            ));
-                        }
-                    }
-                });
+                        }));
+                }
+            }
+        });
         Logger.info("Finished scanning for listeners in plugins in " + (System.currentTimeMillis() - start2) + "ms!");
 
-// scan for custom events in plugins
+        // scan for custom events in plugins
         eventHandler.init();
 
         // Start the server
@@ -470,6 +503,43 @@ public final class Cytosis {
             Logger.info("Stopping server due to '--ci-test' flag.");
             MinecraftServer.stopCleanly();
         }
+    }
+
+    /**
+     * Loads the world based on the settings
+     */
+    public static void loadWorld() {
+        if (CytosisSettings.SERVER_WORLD_NAME.isEmpty()) {
+            Logger.info("Generating basic world");
+            defaultInstance.setGenerator(unit -> unit.modifier().fillHeight(0, 1, Block.WHITE_STAINED_GLASS));
+            defaultInstance.setChunkSupplier(LightingChunk::new);
+            Logger.info("Basic world loaded!");
+            return;
+        }
+        Logger.info("Loading world '" + CytosisSettings.SERVER_WORLD_NAME + "'");
+        databaseManager.getMysqlDatabase().getWorld(CytosisSettings.SERVER_WORLD_NAME)
+            .whenComplete((polarWorld, throwable) -> {
+                if (throwable != null) {
+                    Logger.error("An error occurred whilst initializing the world! Reverting to a basic world",
+                        throwable);
+                    defaultInstance.setGenerator(unit -> unit.modifier()
+                        .fillHeight(0, 1, Block.WHITE_STAINED_GLASS));
+                    defaultInstance.setChunkSupplier(LightingChunk::new);
+                } else {
+                    defaultInstance.setChunkLoader(new PolarLoader(polarWorld).setWorldAccess(new PolarExtension()));
+                    defaultInstance.setChunkSupplier(LightingChunk::new);
+                    defaultInstance.enableAutoChunkLoad(true);
+                    Logger.info("World loaded!");
+                }
+            });
+    }
+
+    private static void shutdownHandler() {
+        pluginManager.unloadPlugins();
+        natsManager.shutdown();
+        databaseManager.shutdown();
+        sideboardManager.cancelUpdates();
+        getOnlinePlayers().forEach(onlinePlayer -> onlinePlayer.kick(Msg.mm("<red>The server is shutting down.")));
     }
 
     /**
@@ -523,6 +593,20 @@ public final class Cytosis {
     }
 
     /**
+     * Gets the player if they are on THIS instance, by USERNAME
+     *
+     * @param username The name to fetch the player by
+     * @return The optional holding the player if they exist
+     */
+    public static Optional<CytosisPlayer> getPlayer(String username) {
+        if (username == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable((CytosisPlayer) MinecraftServer.getConnectionManager()
+            .getOnlinePlayerByUsername(username));
+    }
+
+    /**
      * Gets the player if they are on THIS instance, by UNIQUE ID
      *
      * @param player The name to fetch the player by
@@ -535,51 +619,16 @@ public final class Cytosis {
     }
 
     /**
-     * Gets the player if they are on THIS instance, by USERNAME
-     *
-     * @param username The name to fetch the player by
-     * @return The optional holding the player if they exist
-     */
-    public static Optional<CytosisPlayer> getPlayer(String username) {
-        if (username == null) return Optional.empty();
-        return Optional.ofNullable((CytosisPlayer) MinecraftServer.getConnectionManager().getOnlinePlayerByUsername(username));
-    }
-
-    /**
      * Gets the player if they are on THIS instance, by UUID
      *
      * @param uuid The uuid to fetch the player by
      * @return The optional holding the player if they exist
      */
     public static Optional<CytosisPlayer> getPlayer(UUID uuid) {
-        if (uuid == null) return Optional.empty();
-        return Optional.ofNullable((CytosisPlayer) MinecraftServer.getConnectionManager().getOnlinePlayerByUuid(uuid));
-    }
-
-    /**
-     * Loads the world based on the settings
-     */
-    public static void loadWorld() {
-        if (CytosisSettings.SERVER_WORLD_NAME.isEmpty()) {
-            Logger.info("Generating basic world");
-            defaultInstance.setGenerator(unit -> unit.modifier().fillHeight(0, 1, Block.WHITE_STAINED_GLASS));
-            defaultInstance.setChunkSupplier(LightingChunk::new);
-            Logger.info("Basic world loaded!");
-            return;
+        if (uuid == null) {
+            return Optional.empty();
         }
-        Logger.info("Loading world '" + CytosisSettings.SERVER_WORLD_NAME + "'");
-        databaseManager.getMysqlDatabase().getWorld(CytosisSettings.SERVER_WORLD_NAME).whenComplete((polarWorld, throwable) -> {
-            if (throwable != null) {
-                Logger.error("An error occurred whilst initializing the world! Reverting to a basic world", throwable);
-                defaultInstance.setGenerator(unit -> unit.modifier().fillHeight(0, 1, Block.WHITE_STAINED_GLASS));
-                defaultInstance.setChunkSupplier(LightingChunk::new);
-            } else {
-                defaultInstance.setChunkLoader(new PolarLoader(polarWorld).setWorldAccess(new PolarExtension()));
-                defaultInstance.setChunkSupplier(LightingChunk::new);
-                defaultInstance.enableAutoChunkLoad(true);
-                Logger.info("World loaded!");
-            }
-        });
+        return Optional.ofNullable((CytosisPlayer) MinecraftServer.getConnectionManager().getOnlinePlayerByUuid(uuid));
     }
 
     /**
@@ -612,15 +661,8 @@ public final class Cytosis {
         return Cytosis.SERVER_ID.replace("Cytosis-", "");
     }
 
-    private static void shutdownHandler() {
-        pluginManager.unloadPlugins();
-        natsManager.shutdown();
-        databaseManager.shutdown();
-        sideboardManager.cancelUpdates();
-        getOnlinePlayers().forEach(onlinePlayer -> onlinePlayer.kick(Msg.mm("<red>The server is shutting down.")));
-    }
-
     public static CytonicServer currentServer() {
-        return new CytonicServer(Utils.getServerIP(), SERVER_ID, CytosisSettings.SERVER_PORT, serverGroup.type(), serverGroup.group());
+        return new CytonicServer(Utils.getServerIP(), SERVER_ID, CytosisSettings.SERVER_PORT, serverGroup.type(),
+            serverGroup.group());
     }
 }

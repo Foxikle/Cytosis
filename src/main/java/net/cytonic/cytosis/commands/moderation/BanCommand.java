@@ -1,5 +1,15 @@
 package net.cytonic.cytosis.commands.moderation;
 
+import java.time.Instant;
+import java.util.UUID;
+
+import net.kyori.adventure.text.Component;
+import net.minestom.server.command.CommandSender;
+import net.minestom.server.command.builder.arguments.ArgumentEnum;
+import net.minestom.server.command.builder.arguments.ArgumentType;
+import net.minestom.server.command.builder.arguments.ArgumentWord;
+import org.jetbrains.annotations.NotNull;
+
 import net.cytonic.cytosis.Cytosis;
 import net.cytonic.cytosis.commands.utils.CommandUtils;
 import net.cytonic.cytosis.commands.utils.CytosisCommand;
@@ -13,17 +23,12 @@ import net.cytonic.cytosis.utils.DurationParser;
 import net.cytonic.cytosis.utils.Msg;
 import net.cytonic.cytosis.utils.PlayerUtils;
 import net.cytonic.cytosis.utils.SnoopUtils;
-import net.kyori.adventure.text.Component;
-import net.minestom.server.command.builder.arguments.ArgumentEnum;
-import net.minestom.server.command.builder.arguments.ArgumentType;
-
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * A command that allows authorized players to ban players.
  */
 public class BanCommand extends CytosisCommand {
+
     /**
      * Creates the command and sets the consumers
      */
@@ -31,8 +36,9 @@ public class BanCommand extends CytosisCommand {
         super("ban");
         setCondition(CommandUtils.IS_MODERATOR);
 
-        var durationArg = ArgumentType.Word("duration");
-        var reasonArg = ArgumentType.Enum("reason", BanReason.class).setFormat(ArgumentEnum.Format.LOWER_CASED);
+        ArgumentWord durationArg = ArgumentType.Word("duration");
+        ArgumentEnum<@NotNull BanReason> reasonArg = ArgumentType.Enum("reason", BanReason.class)
+            .setFormat(ArgumentEnum.Format.LOWER_CASED);
 
         addSyntax((sender, context) -> {
             if (sender instanceof CytosisPlayer actor) {
@@ -47,46 +53,93 @@ public class BanCommand extends CytosisCommand {
 
                 UUID uuid = PlayerUtils.resolveUuid(player);
                 if (uuid == null) {
-                    sender.sendMessage(Msg.mm("<red>The player %s doesn't exist!", player));
+                    sender.sendMessage(Msg.red("The player %s doesn't exist!", player));
                     return;
                 }
 
-                Cytosis.getDatabaseManager().getMysqlDatabase().isBanned(uuid).whenComplete((banned, throwable1) -> {
-                    if (throwable1 != null) {
-                        sender.sendMessage(Msg.mm("<red>An error occured whilst finding if " + player + " is banned!"));
-                        Logger.error("error", throwable1);
-                        return;
-                    }
-                    if (banned.isBanned()) {
-                        sender.sendMessage(Msg.mm("<red>" + player + " is already banned!"));
-                        return;
-                    }
-                    Cytosis.getDatabaseManager().getMysqlDatabase().getPlayerRank(uuid).whenComplete((playerRank, throwable2) -> {
-                        if (throwable2 != null) {
-                            sender.sendMessage(Msg.mm("<red>An error occured whilst finding " + player + "'s rank!"));
-                            Logger.error("error", throwable2);
-                            return;
-                        }
-                        if (playerRank.isStaff()) {
-                            sender.sendMessage(Msg.mm("<red>" + player + " cannot be banned!"));
-                            return;
-                        }
-
-                        Cytosis.getDatabaseManager().getMysqlDatabase().banPlayer(uuid, reason, dur).whenComplete((ignored, throwable3) -> {
-                            if (throwable3 != null) {
-                                actor.sendMessage(Msg.mm("<red>An error occured whilst banning " + player + "!"));
-                                return;
-                            }
-                            Cytosis.getNatsManager().kickPlayer(uuid, KickReason.BANNED, Msg.formatBanMessage(new BanData(reason, dur, true)));
-                            actor.sendMessage(Msg.mm("<green>" + player + " was successfully banned for " + DurationParser.unparseFull(dur) + "."));
-
-                            Component snoop = actor.formattedName().append(Msg.mm("<gray> banned ")).append(SnoopUtils.toTarget(uuid)).append(Msg.mm("<gray> for " + DurationParser.unparseFull(dur) + " with the reason " + reason));
-                            Cytosis.getSnooperManager().sendSnoop(CytosisSnoops.PLAYER_BAN, Msg.snoop(snoop));
-                        });
-                    });
-                });
+                banPlayer(sender, actor, uuid, player, reason, dur);
 
             }
         }, CommandUtils.LIFETIME_PLAYERS, durationArg, reasonArg);
+    }
+
+    private void banPlayer(CommandSender sender, CytosisPlayer actor, UUID uuid, String player, String reason,
+        Instant dur) {
+        Cytosis.getDatabaseManager().getMysqlDatabase().isBanned(uuid)
+            .thenAccept(banData -> handleBanCheck(sender, actor, uuid, player, reason, dur, banData))
+            .exceptionally(throwable -> handleBanCheckError(sender, player, throwable));
+    }
+
+    private void handleBanCheck(CommandSender sender, CytosisPlayer actor, UUID uuid, String player, String reason,
+        Instant dur, BanData banData) {
+        if (banData.isBanned()) {
+            sender.sendMessage(Msg.red("%s is already banned!", player));
+            return;
+        }
+
+        checkPlayerRankAndBan(sender, actor, uuid, player, reason, dur);
+    }
+
+    private void checkPlayerRankAndBan(CommandSender sender, CytosisPlayer actor, UUID uuid, String player,
+        String reason, Instant dur) {
+        Cytosis.getDatabaseManager().getMysqlDatabase().getPlayerRank(uuid).whenComplete((playerRank, throwable) -> {
+            if (throwable != null) {
+                handleRankCheckError(sender, player, throwable);
+                return;
+            }
+
+            if (playerRank.isStaff()) {
+                sender.sendMessage(Msg.mm("%s cannot be banned!", player));
+                return;
+            }
+
+            executeBan(actor, uuid, player, reason, dur);
+        });
+    }
+
+    private void executeBan(CytosisPlayer actor, UUID uuid, String player, String reason, Instant dur) {
+        Cytosis.getDatabaseManager().getMysqlDatabase().banPlayer(uuid, reason, dur)
+            .whenComplete((ignored, throwable) -> {
+                if (throwable != null) {
+                    handleBanExecutionError(actor, player, throwable);
+                    return;
+                }
+
+                handleSuccessfulBan(actor, uuid, player, reason, dur);
+            });
+    }
+
+    private void handleSuccessfulBan(CytosisPlayer actor, UUID uuid, String player, String reason, Instant dur) {
+        BanData banData = new BanData(reason, dur, true);
+        Cytosis.getNatsManager().kickPlayer(uuid, KickReason.BANNED, Msg.formatBanMessage(banData));
+
+        String durationText = DurationParser.unparseFull(dur);
+        actor.sendMessage(Msg.mm("<green>%s was successfully banned for %s.", player, durationText));
+
+        sendBanSnoop(actor, uuid, reason, dur);
+    }
+
+    private void sendBanSnoop(CytosisPlayer actor, UUID uuid, String reason, Instant dur) {
+        String durationText = DurationParser.unparseFull(dur);
+        Component snoop = actor.formattedName().append(Msg.grey(" banned ")).append(SnoopUtils.toTarget(uuid))
+            .append(Msg.grey(" for %s with the reason %s", durationText, reason));
+
+        Cytosis.getSnooperManager().sendSnoop(CytosisSnoops.PLAYER_BAN, Msg.snoop(snoop));
+    }
+
+    private Void handleBanCheckError(CommandSender sender, String player, Throwable throwable) {
+        sender.sendMessage(Msg.red("An error occurred whilst finding if %s is banned!", player));
+        Logger.error("Error checking ban status", throwable);
+        return null;
+    }
+
+    private void handleRankCheckError(CommandSender sender, String player, Throwable throwable) {
+        sender.sendMessage(Msg.red("An error occurred whilst finding %s's rank!", player));
+        Logger.error("Error checking player rank", throwable);
+    }
+
+    private void handleBanExecutionError(CommandSender actor, String player, Throwable throwable) {
+        actor.sendMessage(Msg.red("An error occurred whilst banning %s!", player));
+        Logger.error("Error executing ban", throwable);
     }
 }

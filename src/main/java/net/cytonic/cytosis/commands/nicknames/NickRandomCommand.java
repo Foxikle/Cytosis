@@ -8,6 +8,7 @@ import net.cytonic.cytosis.player.CytosisPlayer;
 import net.cytonic.cytosis.utils.Msg;
 
 public class NickRandomCommand extends CytosisCommand {
+
     public NickRandomCommand() {
         super("random");
         setCondition(CommandUtils.IS_STAFF);
@@ -20,7 +21,10 @@ public class NickRandomCommand extends CytosisCommand {
             }
 
             Cytosis.getNicknameManager().nicknamePlayer(player.getUuid(), NicknameGenerator.generateNicknameData());
-            player.sendMessage(Msg.goldSplash("DISGUISED!", "Your apparent name, rank, and skin have been randomized. To go back to your normal self, use the <#BE9025>/nick reset</#BE9025> command."));
+            player.sendMessage(Msg.goldSplash("DISGUISED!", """
+                Your apparent name, rank, and skin have been randomized. To go back to your
+                normal self, use the <#BE9025>/nick reset</#BE9025> command.
+                """));
         });
     }
 }

@@ -1,16 +1,17 @@
 package net.cytonic.cytosis.managers;
 
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
 import lombok.NoArgsConstructor;
-import net.cytonic.cytosis.Cytosis;
-import net.cytonic.cytosis.utils.polar.PolarExtension;
 import net.hollowcube.polar.PolarLoader;
 import net.minestom.server.instance.Instance;
 import net.minestom.server.instance.InstanceContainer;
 import net.minestom.server.world.DimensionType;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import net.cytonic.cytosis.Cytosis;
+import net.cytonic.cytosis.utils.polar.PolarExtension;
 
 @NoArgsConstructor
 public class InstanceManager {
@@ -23,7 +24,8 @@ public class InstanceManager {
                 return;
             }
 
-            InstanceContainer container = new InstanceContainer(uuid == null ? UUID.randomUUID() : uuid, DimensionType.OVERWORLD);
+            InstanceContainer container = new InstanceContainer(uuid == null ? UUID.randomUUID() : uuid,
+                DimensionType.OVERWORLD);
             container.setChunkLoader(new PolarLoader(world).setWorldAccess(new PolarExtension()));
             Cytosis.getMinestomInstanceManager().registerInstance(container);
             future.complete(container);
@@ -49,13 +51,14 @@ public class InstanceManager {
 
     public CompletableFuture<String> getExtraData(String worldName, String worldType) {
         CompletableFuture<String> future = new CompletableFuture<>();
-        Cytosis.getDatabaseManager().getMysqlDatabase().getWorldExtraData(worldName, worldType).whenComplete((extraData, throwable) -> {
-            if (throwable != null) {
-                future.completeExceptionally(throwable);
-            } else {
-                future.complete(extraData);
-            }
-        });
+        Cytosis.getDatabaseManager().getMysqlDatabase().getWorldExtraData(worldName, worldType)
+            .whenComplete((extraData, throwable) -> {
+                if (throwable != null) {
+                    future.completeExceptionally(throwable);
+                } else {
+                    future.complete(extraData);
+                }
+            });
         return future;
     }
 }

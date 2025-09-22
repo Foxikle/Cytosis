@@ -1,14 +1,15 @@
 package net.cytonic.cytosis.utils;
 
-import net.cytonic.cytosis.Cytosis;
+import java.util.UUID;
+
 import net.kyori.adventure.text.Component;
 
-import java.util.UUID;
+import net.cytonic.cytosis.Cytosis;
 
 public class SnoopUtils {
 
     public static Component toTarget(UUID uuid) {
         return Cytosis.getCytonicNetwork().getCachedPlayerRanks().get(uuid).getPrefix()
-                .append(Component.text(Cytosis.getCytonicNetwork().getLifetimePlayers().getByKey(uuid)));
+            .append(Component.text(Cytosis.getCytonicNetwork().getLifetimePlayers().getByKey(uuid)));
     }
 }

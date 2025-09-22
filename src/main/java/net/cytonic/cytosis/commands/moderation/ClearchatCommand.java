@@ -1,12 +1,13 @@
 package net.cytonic.cytosis.commands.moderation;
 
+import net.kyori.adventure.text.Component;
+
 import net.cytonic.cytosis.Cytosis;
 import net.cytonic.cytosis.commands.utils.CommandUtils;
 import net.cytonic.cytosis.commands.utils.CytosisCommand;
 import net.cytonic.cytosis.config.CytosisSnoops;
 import net.cytonic.cytosis.player.CytosisPlayer;
 import net.cytonic.cytosis.utils.Msg;
-import net.kyori.adventure.text.Component;
 
 /**
  * The class representing the clearchat command
@@ -24,7 +25,8 @@ public class ClearchatCommand extends CytosisCommand {
                 for (CytosisPlayer online : Cytosis.getOnlinePlayers()) {
                     if (online.isStaff()) {
                         // don't actually clear the chat
-                        online.sendMessage(Msg.mm("<green>Chat has been cleared by ").append(player.formattedName()).append(Msg.mm("<green>!")));
+                        online.sendMessage(Msg.mm("<green>Chat has been cleared by ").append(player.formattedName())
+                            .append(Msg.mm("<green>!")));
                     } else {
                         // todo: use the ClearChatPacket, but minestom doesn't support it
                         for (int i = 0; i < 250; i++) {
@@ -32,7 +34,8 @@ public class ClearchatCommand extends CytosisCommand {
                         }
                     }
                 }
-                Component snoop = player.formattedName().append(Msg.mm("<gray> cleared the chat in server " + Cytosis.SERVER_ID + "."));
+                Component snoop = player.formattedName()
+                    .append(Msg.mm("<gray> cleared the chat in server " + Cytosis.SERVER_ID + "."));
                 Cytosis.getSnooperManager().sendSnoop(CytosisSnoops.CHAT_CLEAR, Msg.snoop(snoop));
             } else {
                 sender.sendMessage(Msg.mm("<red>Only players may execute this command :("));

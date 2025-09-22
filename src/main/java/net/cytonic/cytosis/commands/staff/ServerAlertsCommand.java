@@ -22,12 +22,15 @@ public class ServerAlertsCommand extends CytosisCommand {
         setDefaultExecutor((sender, ignored) -> {
             if (sender instanceof CytosisPlayer player) {
 
-                if (!Cytosis.getPreferenceManager().getPlayerPreference(player.getUuid(), CytosisPreferences.SERVER_ALERTS)) {
+                if (!Cytosis.getPreferenceManager()
+                    .getPlayerPreference(player.getUuid(), CytosisPreferences.SERVER_ALERTS)) {
                     player.sendMessage(Msg.mm("<green>Server alerts are now enabled!"));
-                    Cytosis.getPreferenceManager().updatePlayerPreference(player.getUuid(), CytosisNamespaces.SERVER_ALERTS, true);
+                    Cytosis.getPreferenceManager()
+                        .updatePlayerPreference(player.getUuid(), CytosisNamespaces.SERVER_ALERTS, true);
                 } else {
                     player.sendMessage(Msg.mm("<red>Server alerts are now disabled!"));
-                    Cytosis.getPreferenceManager().updatePlayerPreference(player.getUuid(), CytosisNamespaces.SERVER_ALERTS, false);
+                    Cytosis.getPreferenceManager()
+                        .updatePlayerPreference(player.getUuid(), CytosisNamespaces.SERVER_ALERTS, false);
                 }
 
             }

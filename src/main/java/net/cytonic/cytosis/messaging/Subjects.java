@@ -6,6 +6,7 @@ import net.cytonic.cytosis.Cytosis;
  * A list of every subject used by the NATS server
  */
 public class Subjects {
+
     public static final String SERVER_REGISTER = "servers.register";
     public static final String SERVER_SHUTDOWN = "servers.shutdown";
     public static final String SERVER_LIST = "servers.list";
@@ -19,7 +20,6 @@ public class Subjects {
     public static final String PLAYER_SEND_GENERIC = "players.send.generic";
     public static final String PLAYER_SERVER_CHANGE = "players.server_change.notify";
     public static final String PLAYER_RANK_UPDATE = "players.rank.update";
-
 
     public static final String HEALTH_CHECK = "health.check." + Cytosis.getRawID();
 

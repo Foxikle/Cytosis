@@ -1,12 +1,13 @@
 package net.cytonic.cytosis.commands.staff.snooper;
 
+import net.minestom.server.command.builder.arguments.ArgumentType;
+import net.minestom.server.command.builder.arguments.ArgumentWord;
+import net.minestom.server.command.builder.suggestion.SuggestionEntry;
+
 import net.cytonic.cytosis.Cytosis;
 import net.cytonic.cytosis.commands.utils.CommandUtils;
 import net.cytonic.cytosis.commands.utils.CytosisCommand;
 import net.cytonic.cytosis.player.CytosisPlayer;
-import net.minestom.server.command.builder.arguments.ArgumentType;
-import net.minestom.server.command.builder.arguments.ArgumentWord;
-import net.minestom.server.command.builder.suggestion.SuggestionEntry;
 
 public class SnooperCommand extends CytosisCommand {
 
@@ -15,8 +16,9 @@ public class SnooperCommand extends CytosisCommand {
     static {
         CHANNELS.setSuggestionCallback((commandSender, commandContext, suggestion) -> {
             if (!(commandSender instanceof CytosisPlayer player)) return;
-            CommandUtils.filterEntries(commandContext.get(CHANNELS), Cytosis.getSnooperManager().getAllChannels(player).stream().map(SuggestionEntry::new).toList())
-                    .forEach(suggestion::addEntry);
+            CommandUtils.filterEntries(commandContext.get(CHANNELS), Cytosis.getSnooperManager().getAllChannels(player)
+                .stream().map(SuggestionEntry::new)
+                .toList()).forEach(suggestion::addEntry);
         });
     }
 

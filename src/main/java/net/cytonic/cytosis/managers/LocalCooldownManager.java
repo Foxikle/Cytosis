@@ -1,19 +1,20 @@
 package net.cytonic.cytosis.managers;
 
-import lombok.NoArgsConstructor;
-import net.kyori.adventure.key.Key;
-import net.minestom.server.MinecraftServer;
-import net.minestom.server.timer.TaskSchedule;
-import org.jetbrains.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.NoArgsConstructor;
+import net.kyori.adventure.key.Key;
+import net.minestom.server.MinecraftServer;
+import net.minestom.server.timer.TaskSchedule;
+import org.jetbrains.annotations.Nullable;
+
 @NoArgsConstructor
 public class LocalCooldownManager {
+
     private final Map<Key, Instant> server = new ConcurrentHashMap<>();
     private final Map<UUID, Map<Key, Instant>> personal = new ConcurrentHashMap<>();
 
@@ -41,18 +42,28 @@ public class LocalCooldownManager {
     }
 
     public boolean isOnServerCooldown(Key key) {
-        if (!server.containsKey(key)) return false;
+        if (!server.containsKey(key)) {
+            return false;
+        }
         Instant expire = server.get(key);
-        if (expire.isAfter(Instant.now())) return true;
+        if (expire.isAfter(Instant.now())) {
+            return true;
+        }
         server.remove(key);
         return false;
     }
 
     public boolean isOnPersonalCooldown(UUID uuid, Key key) {
-        if (!personal.containsKey(uuid)) return false;
-        if (!personal.get(uuid).containsKey(key)) return false;
+        if (!personal.containsKey(uuid)) {
+            return false;
+        }
+        if (!personal.get(uuid).containsKey(key)) {
+            return false;
+        }
         Instant expire = personal.get(uuid).get(key);
-        if (expire.isAfter(Instant.now())) return true;
+        if (expire.isAfter(Instant.now())) {
+            return true;
+        }
         personal.get(uuid).remove(key);
         return false;
     }
@@ -79,7 +90,9 @@ public class LocalCooldownManager {
 
     @Nullable
     public Instant getPersonalExpiry(UUID uuid, Key id) {
-        if (!personal.containsKey(uuid)) return null;
+        if (!personal.containsKey(uuid)) {
+            return null;
+        }
         Instant expire = personal.get(uuid).get(id);
         if (expire == null || expire.isBefore(Instant.now())) {
             personal.get(uuid).remove(id);

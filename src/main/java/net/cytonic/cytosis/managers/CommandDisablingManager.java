@@ -1,14 +1,15 @@
 package net.cytonic.cytosis.managers;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+
+import org.jetbrains.annotations.Nullable;
+
 import net.cytonic.cytosis.Cytosis;
 import net.cytonic.cytosis.commands.utils.CytosisCommand;
 import net.cytonic.cytosis.logging.Logger;
 import net.cytonic.cytosis.messaging.NatsManager;
-import org.jetbrains.annotations.Nullable;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 public class CommandDisablingManager {
 
@@ -38,6 +39,14 @@ public class CommandDisablingManager {
         });
     }
 
+    @Nullable
+    private CytosisCommand parseCommand(String rawCommand) {
+        if (Cytosis.getCommandManager().getCommand(rawCommand) instanceof CytosisCommand cc) {
+            return cc;
+        }
+        return null;
+    }
+
     /**
      * Disables a command locally, so it's only disabled on this server.
      *
@@ -45,7 +54,9 @@ public class CommandDisablingManager {
      * @return if the command was successfully disabled.
      */
     public boolean disableCommandLocally(CytosisCommand cmd) {
-        if (cmd.isDisabled()) return false;
+        if (cmd.isDisabled()) {
+            return false;
+        }
         cmd.setDisabled(true);
         return true;
     }
@@ -57,13 +68,16 @@ public class CommandDisablingManager {
      * @return if the command was successfully enabled again
      */
     public boolean enableCommandLocally(CytosisCommand cmd) {
-        if (!cmd.isDisabled()) return false;
+        if (!cmd.isDisabled()) {
+            return false;
+        }
         cmd.setDisabled(false);
         return true;
     }
 
     /**
-     * Globally disables the given command. Normal players will not be able to use the command on any server. Administrators can bypass this, though.
+     * Globally disables the given command. Normal players will not be able to use the command on any server.
+     * Administrators can bypass this, though.
      *
      * @param cmd the command to disable everywhere
      * @return if the command was successfully disabled
@@ -72,6 +86,10 @@ public class CommandDisablingManager {
         sendCommandDisable(cmd.getName().getBytes(StandardCharsets.UTF_8));
         Cytosis.getDatabaseManager().getRedisDatabase().addValue("cytosis-disabled-commands", cmd.getName());
         return true;
+    }
+
+    private void sendCommandDisable(byte[] message) {
+        Cytosis.getNatsManager().publish("cytosis.commands.disabled", message);
     }
 
     /**
@@ -86,12 +104,8 @@ public class CommandDisablingManager {
         return true;
     }
 
-    @Nullable
-    private CytosisCommand parseCommand(String rawCommand) {
-        if (Cytosis.getCommandManager().getCommand(rawCommand) instanceof CytosisCommand cc) {
-            return cc;
-        }
-        return null;
+    private void sendCommandEnable(byte[] message) {
+        Cytosis.getNatsManager().publish("cytosis.commands.enabled", message);
     }
 
     public CompletableFuture<Void> loadRemotes() {
@@ -113,17 +127,9 @@ public class CommandDisablingManager {
         });
     }
 
-
-    private void sendCommandEnable(byte[] message) {
-        Cytosis.getNatsManager().publish("cytosis.commands.enabled", message);
-    }
-
-    private void sendCommandDisable(byte[] message) {
-        Cytosis.getNatsManager().publish("cytosis.commands.disabled", message);
-    }
-
     public boolean isDisabledGlobally(CytosisCommand cmd) {
-        return Cytosis.getDatabaseManager().getRedisDatabase().getSet("cytosis-disabled-commands").contains(cmd.getName());
+        return Cytosis.getDatabaseManager().getRedisDatabase().getSet("cytosis-disabled-commands")
+            .contains(cmd.getName());
     }
 
     public boolean isDisabledLocally(CytosisCommand cmd) {

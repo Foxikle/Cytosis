@@ -1,24 +1,29 @@
 package net.cytonic.cytosis.commands.disabling;
 
+import net.minestom.server.command.builder.arguments.ArgumentBoolean;
+import net.minestom.server.command.builder.arguments.ArgumentType;
+import net.minestom.server.command.builder.arguments.ArgumentWord;
+import net.minestom.server.command.builder.suggestion.SuggestionEntry;
+
 import net.cytonic.cytosis.Cytosis;
 import net.cytonic.cytosis.commands.utils.CommandUtils;
 import net.cytonic.cytosis.commands.utils.CytosisCommand;
 import net.cytonic.cytosis.managers.CommandDisablingManager;
 import net.cytonic.cytosis.utils.Msg;
-import net.minestom.server.command.builder.arguments.ArgumentType;
-import net.minestom.server.command.builder.suggestion.SuggestionEntry;
-
 
 public class DisableCommand extends CytosisCommand {
 
     public DisableCommand() {
         super("disablecommand", "disable");
         setCondition(CommandUtils.IS_ADMIN);
-        var cmd = ArgumentType.Word("cmd");
-        var global = ArgumentType.Boolean("global").setDefaultValue(false);
+        ArgumentWord cmd = ArgumentType.Word("cmd");
+        ArgumentBoolean global = ArgumentType.Boolean("global");
+        global.setDefaultValue(false);
         global.setSuggestionCallback((s, c, suggestion) -> {
-            suggestion.addEntry(new SuggestionEntry("true", Msg.mm("<red>Disables this command on every server.</red><newline><dark_gray><i>Administrators are immune.")));
-            suggestion.addEntry(new SuggestionEntry("false", Msg.mm("<green>Disables this command only on <b>THIS</b> server.</green><newline><dark_gray><i>Administrators are immune.")));
+            suggestion.addEntry(new SuggestionEntry("true", Msg.red(
+                "Disables this command on every server.<newline><dark_gray><i>Administrators are immune.")));
+            suggestion.addEntry(new SuggestionEntry("false", Msg.green(
+                "Disables this command only on <b>THIS</b> server.<newline><dark_gray><i>Administrators are immune.")));
         });
 
         setDefaultExecutor((sender, context) -> sender.sendMessage(Msg.whoops("Invalid Syntax! /disable <cmd>")));
@@ -34,7 +39,8 @@ public class DisableCommand extends CytosisCommand {
                         return;
                     }
                     manager.disableCommandGlobally(command);
-                    sender.sendMessage(Msg.redSplash("DISABLED!", "disabled the '" + rawCommand + "' command on every server."));
+                    sender.sendMessage(
+                        Msg.redSplash("DISABLED!", "disabled the '" + rawCommand + "' command on every server."));
                     return;
                 }
 
@@ -43,7 +49,8 @@ public class DisableCommand extends CytosisCommand {
                     return;
                 }
                 manager.disableCommandLocally(command);
-                sender.sendMessage(Msg.redSplash("DISABLED!", "disabled the '" + rawCommand + "' command on this server."));
+                sender.sendMessage(
+                    Msg.redSplash("DISABLED!", "disabled the '" + rawCommand + "' command on this server."));
             }
 
         }, cmd, global);

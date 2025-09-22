@@ -1,5 +1,11 @@
 package net.cytonic.cytosis.commands.moderation;
 
+import java.util.UUID;
+
+import net.kyori.adventure.text.Component;
+import net.minestom.server.command.builder.arguments.ArgumentType;
+import net.minestom.server.command.builder.suggestion.SuggestionEntry;
+
 import net.cytonic.cytosis.Cytosis;
 import net.cytonic.cytosis.commands.utils.CommandUtils;
 import net.cytonic.cytosis.commands.utils.CytosisCommand;
@@ -7,11 +13,6 @@ import net.cytonic.cytosis.config.CytosisSnoops;
 import net.cytonic.cytosis.player.CytosisPlayer;
 import net.cytonic.cytosis.utils.Msg;
 import net.cytonic.cytosis.utils.SnoopUtils;
-import net.kyori.adventure.text.Component;
-import net.minestom.server.command.builder.arguments.ArgumentType;
-import net.minestom.server.command.builder.suggestion.SuggestionEntry;
-
-import java.util.UUID;
 
 public class UnbanCommand extends CytosisCommand {
 
@@ -23,13 +24,14 @@ public class UnbanCommand extends CytosisCommand {
         playerArg.setSuggestionCallback((sender, ignored, suggestion) -> {
             if (sender instanceof CytosisPlayer player) {
                 player.sendActionBar(Msg.mm("<green>Fetching banned players..."));
-                Cytosis.getCytonicNetwork().getBannedPlayers().forEach((uuid, ignored1) -> suggestion.addEntry(new SuggestionEntry(Cytosis.getCytonicNetwork().getLifetimePlayers().getByKey(uuid))));
+                Cytosis.getCytonicNetwork().getBannedPlayers()
+                    .forEach((uuid, ignored1) -> suggestion.addEntry(new SuggestionEntry(Cytosis.getCytonicNetwork()
+                        .getLifetimePlayers()
+                        .getByKey(uuid))));
             }
         });
         addSyntax((sender, context) -> {
-            if (!(sender instanceof CytosisPlayer actor)) {
-                return;
-            }
+            if (!(sender instanceof CytosisPlayer actor)) return;
 
             final String player = context.get(playerArg);
             if (!Cytosis.getCytonicNetwork().getLifetimePlayers().containsValue(player)) {
@@ -42,8 +44,8 @@ public class UnbanCommand extends CytosisCommand {
                 return;
             }
 
-
-            Component snoop = actor.formattedName().append(Msg.mm("<gray> unbanned ")).append(SnoopUtils.toTarget(uuid)).append(Msg.mm("<gray>."));
+            Component snoop = actor.formattedName().append(Msg.mm("<gray> unbanned ")).append(SnoopUtils.toTarget(uuid))
+                .append(Msg.mm("<gray>."));
 
             Cytosis.getSnooperManager().sendSnoop(CytosisSnoops.PLAYER_UNBAN, Msg.snoop(snoop));
 

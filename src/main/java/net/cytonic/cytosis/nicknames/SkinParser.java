@@ -1,15 +1,16 @@
 package net.cytonic.cytosis.nicknames;
 
-import com.google.gson.Gson;
-import net.cytonic.cytosis.Cytosis;
-import net.cytonic.cytosis.data.objects.Tuple;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.List;
+
+import com.google.gson.Gson;
+
+import net.cytonic.cytosis.Cytosis;
+import net.cytonic.cytosis.data.objects.Tuple;
 
 public class SkinParser {
 
@@ -30,10 +31,12 @@ public class SkinParser {
     }
 
     static class SkinFile {
+
         List<Skin> skins;
     }
 
     static class Skin {
+
         String signature;
         String value;
     }
